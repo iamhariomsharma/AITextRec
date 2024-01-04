@@ -7,6 +7,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 
@@ -35,5 +36,26 @@ class UriReader(private val context: Context) {
             width = (height * bitmapRatio).toInt()
         }
         return Bitmap.createScaledBitmap(image, width, height, true)
+    }
+
+    fun getByteArrayFromAsset(fileName: String): ByteArray? {
+        try {
+            val inputStream = context.assets.open(fileName)
+
+            val byteOutputStream = ByteArrayOutputStream()
+            val buffer = ByteArray(1024)
+            var length: Int
+            while (inputStream.read(buffer).also { length = it } != -1) {
+                byteOutputStream.write(buffer, 0, length)
+            }
+
+            inputStream.close()
+            byteOutputStream.close()
+
+            return byteOutputStream.toByteArray()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return null
     }
 }

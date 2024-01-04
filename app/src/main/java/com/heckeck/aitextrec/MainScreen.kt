@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -44,19 +46,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(
     state: MainState,
-    onPhotoPicked: (Uri) -> Unit,
+    onPhotosPicked: (List<Uri>) -> Unit,
     onSuggestionClick: () -> Unit,
     onClear: () -> Unit,
     snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri ->
-            if (uri != null) {
-                onPhotoPicked(uri)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        onResult = { uris ->
+            if (uris.isNotEmpty()) {
+                onPhotosPicked(uris)
             }
         }
     )
@@ -74,15 +76,24 @@ fun MainScreen(
             modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        if (state.selectedImageBitmap != null) {
-            AsyncImage(
-                model = state.selectedImageBitmap,
-                contentDescription = "doc image",
+        if (state.selectedImageBitmaps.isNotEmpty()) {
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(250.dp),
-                contentScale = ContentScale.Crop
-            )
+                    .height(200.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(state.selectedImageBitmaps) { imageBitmap ->
+                    AsyncImage(
+                        model = imageBitmap,
+                        contentDescription = "doc image",
+                        modifier = Modifier
+                            .size(200.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
         } else {
             Box(
                 modifier = Modifier
@@ -124,7 +135,8 @@ fun MainScreen(
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 IconButton(onClick = {
-                    val clipboardManager = context.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                    val clipboardManager =
+                        context.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                     val clipData = ClipData.newPlainText("label", state.response)
                     clipboardManager.setPrimaryClip(clipData)
                     scope.launch {

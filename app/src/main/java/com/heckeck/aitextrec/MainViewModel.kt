@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -20,11 +21,12 @@ class MainViewModel(
     var state by mutableStateOf(MainState())
         private set
 
-    fun onImageSelected(uri: Uri) {
+    fun onImageSelected(uris: List<Uri>) {
         viewModelScope.launch {
             try {
+                val bitmaps = uris.map { uriReader.readBitmap(it) }
                 state = state.copy(
-                    selectedImageBitmap = uriReader.readBitmap(uri)
+                    selectedImageBitmaps = bitmaps
                 )
             } catch (e: IOException) {
                 e.printStackTrace()
@@ -34,26 +36,33 @@ class MainViewModel(
 
     fun onClearImage() {
         state = state.copy(
-            selectedImageBitmap = null,
+            selectedImageBitmaps = emptyList(),
             response = ""
         )
     }
 
     fun onSuggestClick(model: GenerativeModel) {
-        if (state.selectedImageBitmap == null || state.isLoading) {
+        if (state.selectedImageBitmaps.isEmpty() || state.isLoading) {
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
             state = state.copy(isLoading = true)
-            val response = model.generateContent(
-                content {
-                    image(state.selectedImageBitmap ?: return@content)
-                    text("Please read document number only from this document without any space or dash, trim the space between or outside characters in your response if there is any, also capitalize all characters")
+
+            val prompt = content {
+                for (selectedImage in state.selectedImageBitmaps) {
+                    image(selectedImage)
+                    text("Please read document number only from these documents without any space or dash, trim the space between or outside characters in your response if there is any, also capitalize all characters")
                 }
-            )
-            println(response)
+            }
+
+            var output = ""
+
+            model.generateContentStream(prompt).collect { chunk ->
+                output += chunk.text
+            }
+
             state = state.copy(
-                response = response.text ?: "Something went wrong",
+                response = output,
                 isLoading = false
             )
         }
